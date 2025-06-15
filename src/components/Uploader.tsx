@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import { Loader2, Trash2 } from "lucide-react";
 
 export function Uploader() {
   const [files, setFiles] = useState<
@@ -22,6 +23,52 @@ export function Uploader() {
       objectUrl?: string;
     }>
   >([]);
+
+  async function removeFile(fileId: string) {
+    try {
+      const fileToRemove = files.find((f) => f.id === fileId);
+
+      if (fileToRemove) {
+        if (fileToRemove.objectUrl) {
+          URL.revokeObjectURL(fileToRemove.objectUrl);
+        }
+      }
+
+      setFiles((prevFiles) =>
+        prevFiles.map((f) => (f.id === fileId ? { ...f, isDeleting: true } : f))
+      );
+
+      const deleteFileResponse = await fetch("/api/s3/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: fileToRemove?.key }),
+      });
+
+      if (!deleteFileResponse.ok) {
+        toast.error("파일 삭제 실패");
+
+        setFiles((prevFiles) =>
+          prevFiles.map((f) =>
+            f.id === fileId ? { ...f, isDeleting: false, error: true } : f
+          )
+        );
+
+        return;
+      }
+
+      toast.success("파일 삭제 성공");
+
+      setFiles((prevFiles) => prevFiles.filter((f) => f.id !== fileId));
+    } catch {
+      toast.error("파일 삭제 실패");
+
+      setFiles((prevFiles) =>
+        prevFiles.map((f) =>
+          f.id === fileId ? { ...f, isDeleting: false, error: true } : f
+        )
+      );
+    }
+  }
 
   const uploadFile = async (file: File) => {
     setFiles((prevFiles) =>
@@ -193,7 +240,7 @@ export function Uploader() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 mt-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 mt-6 pb-24">
         {files.map((file) => (
           <div key={file.id} className="flex flex-col gap-1">
             <div className="relative aspect-square rounded-lg overflow-hidden">
@@ -203,6 +250,20 @@ export function Uploader() {
                 className="w-full h-full object-cover"
               />
 
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={() => removeFile(file.id)}
+                disabled={file.uploading || file.isDeleting}
+              >
+                {file.isDeleting ? (
+                  <Loader2 className="animate-spin size-4" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+              </Button>
+
               {file.uploading && !file.isDeleting && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <p className="text-white font-medium text-lg">
@@ -210,7 +271,16 @@ export function Uploader() {
                   </p>
                 </div>
               )}
+
+              {file.error && (
+                <div className="absolute inset-0 bg-red-500/50 flex items-center justify-center">
+                  <p className="text-white font-medium text-lg">업로드 실패</p>
+                </div>
+              )}
             </div>
+            <p className="text-sm text-muted-foreground truncate">
+              {file.file.name}
+            </p>
           </div>
         ))}
       </div>
