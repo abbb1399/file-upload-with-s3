@@ -23,10 +23,40 @@ export function Uploader() {
     }>
   >([]);
 
-  function uploadFile(file: File) {
+  async function uploadFile(file: File) {
     setFiles((prevFiles) =>
       prevFiles.map((f) => (f.file === file ? { ...f, uploading: true } : f))
     );
+
+    try {
+      const presignedUrlResponse = await fetch("/api/s3/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        }),
+      });
+
+      if (!presignedUrlResponse.ok) {
+        toast.error("Failed to get presigned url");
+
+        setFiles((prevFiles) =>
+          prevFiles.map((f) =>
+            f.file === file
+              ? { ...f, uploading: false, progress: 0, error: true }
+              : f
+          )
+        );
+
+        return;
+      }
+
+      const { presignedUrl, key } = await presignedUrlResponse.json();
+    } catch {}
   }
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -44,14 +74,11 @@ export function Uploader() {
         })),
       ]);
 
-      try{
-        
-      }catch{
-
-      }
+      try {
+      } catch {}
     }
 
-    acceptedFiles.forEach((uploadFile) => { 
+    acceptedFiles.forEach((uploadFile) => {
       uploadFile(uploadFile);
     });
   }, []);
