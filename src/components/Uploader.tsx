@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FileRejection, useDropzone } from "react-dropzone";
 import { Card, CardContent } from "./ui/card";
 import { cn } from "@/lib/utils";
@@ -211,6 +211,16 @@ export function Uploader() {
       "image/*": [],
     },
   });
+
+  useEffect(() => {
+    return () => {
+      files.forEach((file) => {
+        if (file.objectUrl) {
+          URL.revokeObjectURL(file.objectUrl);
+        }
+      });
+    };
+  }, [files]);
 
   return (
     <>
